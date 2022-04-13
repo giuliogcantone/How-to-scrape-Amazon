@@ -52,11 +52,37 @@ Now, in theory, we could proceed to select only the part of content of our inter
 
 ```{r}
 read_html(URL) %>%
-  html_nodes(".review-text-content span") %>%
+  html_elements(".review-text-content span") %>%
   html_text() -> reviews
 
 reviews %>% head(2)
 ```
+
+### Sometimes you want to scrape a link.
+
+More in general, sometimes you want to scrape an `html`-attribute. What is an attribute? Is a code that modifies or 'augment' the front-end of the content called in the code. Most of the times, you just want to scrape a link, that is exactly an augment of a text or an image.
+
+For example, for linking something in Markdown, the language behind this document, you have to back-end this format: `[text](link)`. Taking this metaphor in mind, the equivalent in `rvest` would be to select (`html_elements`) the `[text]`, but then to extract the `(link)` attribute, not the text in itself. In `rvest`, this is done with the command `html_attr("href")`.
+
+```{r}
+read_html(URL) %>%
+  html_elements("#cm_cr-review_list .a-profile") %>%
+  html_attr("href")
+```
+This is a list of all the times that `rvest` finds a list of link associated to usernames, in the list of reviews for that URL. We would expect only a list of 10 elements, but it may be more. This is because Amazon code is not exactly very tidy, so I wrapped the code with a fix that will leave only unique links.
+
+```{r}
+read_html(URL) %>%
+  html_elements("#cm_cr-review_list .a-profile") %>%
+  html_attr("href") %>%
+  str_remove("\\/ref.*") %>%
+  unique()
+```
+Much tidier, right?
+
+In theory, you can also extract all the attributes of the selected content with `html_attr()`, but I don't think it's really useful.
+
+# Ready for scraping the whole thing?
 
 There are a bunch of issues to solve, here:
 
@@ -69,11 +95,11 @@ Let's solve these issue!
 
 The scraper downloaded only 10 reviews because in the URL that I provided there are those 10. There are other reviews for the jar of pesto in Amazon, but they are in other URLs. Luckily, it's quite easy to infer where these are...
 
-for example...
+For example...
 
 ```{r}
 read_html(URL %>% str_c("2")) %>%
-  html_nodes(".review-text-content span") %>%
+  html_elements(".review-text-content span") %>%
   html_text() -> reviews
 
 reviews %>% head(2)
@@ -89,7 +115,7 @@ So, which is the number of pages for the jar of pesto?
 
 On Amazon it is not explicit, however it is explicit the number of written reviews, that can be selected from the main `URL` with a specific selector.
 
-```{r}
+```{}
 read_html (URL) %>%
   html_node("#filter-info-section span") %>% html_text
 ```
@@ -98,13 +124,13 @@ The information is here, but we need to polish it. The number we are looking for
 
 ```{r}
 read_html (URL) %>%
-  html_node("#filter-info-section span") %>% html_text %>% word(25) %>%
+  html_elements("#filter-info-section span") %>% html_text %>% word(25) %>%
   as.integer() -> nrev
 nrev
 ```
 Finally, if for each 10 reviews will be generated a new page on Amazon, then the number of pages is...
 
-```{r}
+```{}
 ceiling(nrev / 10) -> lastpage
 lastpage
 ```
@@ -121,37 +147,95 @@ However, I think that the best method is to fill separate `vectors` and only aft
 reviews = list()
 ```
 
-```{r}
-for (i in 1:2) {
+```{}
+for (i in 1:lastpage) {
   
-  read_html(URL %>% str_c(i)) -> x
+read_html(URL %>% str_c(i)) -> x
   
 reviews$Product[(1+(i-1)*10):(i*10)] = "Pesto Jar"
   
     # Timestamp  
-  x %>% html_nodes("#cm_cr-review_list .review-date") %>%
+  x %>% html_elements("#cm_cr-review_list .review-date") %>%
     html_text() -> reviews$Time[(1+(i-1)*10):(i*10)]
   
-    # Username  
-  x %>% html_nodes("#cm_cr-review_list .a-profile-name") %>%
-    html_text() %>%
-    ifelse(length(.) > 10,
-           rle(.)$values[1:10],
-           .) -> reviews$User[(1+(i-1)*10):(i*10)]
+    # Userpage link
+  x %>% html_elements("#cm_cr-review_list .a-profile") %>%
+  html_attr("href") %>%
+  str_remove("\\/ref.*") %>%
+  unique() -> reviews$User[(1+(i-1)*10):(i*10)]
   
     # Score
-  x %>% html_nodes("#cm_cr-review_list .review-rating") %>%
+  x %>% html_elements("#cm_cr-review_list .review-rating") %>%
     html_text() -> reviews$Score[(1+(i-1)*10):(i*10)]
   
     # Comment
-  x %>% html_nodes(".review-text-content span") %>%
+  x %>% html_elements(".review-text-content span") %>%
     html_text() %>% .[. != ""] -> reviews$Text[(1+(i-1)*10):(i*10)]
-  
 }
 ```
 
 ```{r}
 db = as_tibble(reviews)
 db
+```
+
+Yes, the `db` needs a bit more of cleaning, but this is higly dependent by the Amazon website you are going to scrape. These data are in Italian. In my experience the different languages requires slightly different workflows, and unfortunately I cannot say that the selectors in `html_elements` are the same across languages...
+
+### Why a for cycle?
+
+Why a `for` cycle and not something fancier, like a `map_*`? In my experience, everytime you have to connect to a website you always want a slow, procedural, controlled `for` cycle.
+
+
+# Tell me more about CSS selectors
+
+There are two ways for fishing for selectors:
+
+* [SelectorGadget](https://chrome.google.com/webstore/detail/selectorgadget/mhjhnkcfbdhnjickkkdbjoemdmbfginb)
+* Inspecting the back-end code of the webpage
+
+My suggestion is to watch a video-guide on SelectorGadget and start playing with it in simpler websites. Amazon is not very simple. The key idea to memorize is that you always start highliting in green something in the front-end that you want to scrape for sure, then you localize elements that you want to be out of the selection. SelectorGadget will highlight these in red. In the end it should provide a CSS selector code to insert in the `html_elements()` command.
+
+Personally, I prefer go searching within the `html` code of the page.
+My strategy is something like this:
+
+* I decide an example of front-end text that I want to scrape
+* I look for the position of that text in the back-end code
+* I try to deduce the class (`class=something`) of that elements. Often that class is in common with all the other elements with the same functions (e.g. the score)
+* `html_elements(".something")`
+
+Sometimes I need to scrape `html_elements(".something")` only within a section of the page; for example, look in the code above that I select with:
+
+`html_elements("#cm_cr-review_list .review-rating")`
+
+The function of `#cm_cr-review_list` is to limit the selection only within a section of the webpage called `cm_cr-review_list` in the `html` code of the webpage.
+
+# Why to limit only to a jar of pesto?
+
+In theory, every single product on Amazon can be scraped. Sometimes it is useful to make a collection of similar items.
+
+There are many ways to do so. I think that the most reliable would be to collect in a `tibble`:
+
+* the product ID (e.g. "Pesto Jar")
+* all the webpages associated to their `pageNum`
+* the lastpage for each ID
+
+Let's name this `tibble` as `URL_list`
+
+Then , instead of reading the `html` code from
+
+`read_html(URL %>% str_c(i)) -> x`
+
+the `for` cycle would iterate `x` across
+
+`read_html(URL_list$URL[i]) -> x`.
+
+The final `db` would look like this:
+
+```{r}
+tibble(Product = c("Pesto Jar","Pesto Jar","Tuna Can"),
+       Time = c("Monday","Tuesday","Sunday"),
+       User = c("Donald","Goofy","Donald"),
+       Score = c(4,5,2)
+)
 ```
 

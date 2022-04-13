@@ -72,8 +72,12 @@ for (i in c(1:lastpage)) {
 
 
 
-x %>% html_nodes("#cm_cr-review_list .review-date") %>%
-  html_text() -> reviews$Time[[(1+(i-1)*10):(i*10)]]
+x %>% html_nodes("#cm_cr-review_list .a-profile") %>%
+  html_attrs()
+
+html_att
+
+html_
 
 reviews$Time
 
@@ -82,14 +86,27 @@ x %>% html_nodes("#cm_cr-review_list .a-profile-name") %>%
     length(. %>% as.vector()) > 10) 
 
 x %>% html_nodes("#cm_cr-review_list .a-profile-name") %>%
-  html_text() %>% length() > 10
+  html_text() %>% seq_len()
 
 length()
 
 v = c(1,2,2,3,4,5,4,1,1,2,2)
 
-v %>% ifelse(. > 10,
-             1,
-             2)
+ifelse(length(1:11) > 10,1)
 
-v[v != dplyr::lag(v, default = Inf)]
+1:11 %>% length() > 10
+
+ifelse(2 >3)
+
+?magrittr
+
+
+1:11 %>% {ifelse(length(.) > 10,1)}
+
+x %>% html_elements(".a href") %>%
+  html_text()
+
+
+  {ifelse(length(.) > 10,
+          rle(.)$values[1:10],
+          .)}
