@@ -115,7 +115,7 @@ So, which is the number of pages for the jar of pesto?
 
 On Amazon it is not explicit, however it is explicit the number of written reviews, that can be selected from the main `URL` with a specific selector.
 
-```{}
+```{r}
 read_html (URL) %>%
   html_node("#filter-info-section span") %>% html_text
 ```
@@ -130,7 +130,7 @@ nrev
 ```
 Finally, if for each 10 reviews will be generated a new page on Amazon, then the number of pages is...
 
-```{}
+```{r}
 ceiling(nrev / 10) -> lastpage
 lastpage
 ```
@@ -147,7 +147,7 @@ However, I think that the best method is to fill separate `vectors` and only aft
 reviews = list()
 ```
 
-```{}
+```{r}
 for (i in 1:lastpage) {
   
 read_html(URL %>% str_c(i)) -> x

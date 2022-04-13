@@ -219,8 +219,12 @@ On Amazon it is not explicit, however it is explicit the number of
 written reviews, that can be selected from the main `URL` with a
 specific selector.
 
-    read_html (URL) %>%
-      html_node("#filter-info-section span") %>% html_text
+``` r
+read_html (URL) %>%
+  html_node("#filter-info-section span") %>% html_text
+```
+
+    ## [1] NA
 
 The information is here, but we need to polish it. The number we are
 looking for is “290 recensioni globali”.
@@ -237,8 +241,12 @@ nrev
 Finally, if for each 10 reviews will be generated a new page on Amazon,
 then the number of pages is…
 
-    ceiling(nrev / 10) -> lastpage
-    lastpage
+``` r
+ceiling(nrev / 10) -> lastpage
+lastpage
+```
+
+    ## [1] 29
 
 ## The best way to organize a scraped dataset
 
@@ -261,37 +269,52 @@ done the whole operations are much more smooth.
 reviews = list()
 ```
 
-    for (i in 1:lastpage) {
-      
-    read_html(URL %>% str_c(i)) -> x
-      
-    reviews$Product[(1+(i-1)*10):(i*10)] = "Pesto Jar"
-      
-        # Timestamp  
-      x %>% html_elements("#cm_cr-review_list .review-date") %>%
-        html_text() -> reviews$Time[(1+(i-1)*10):(i*10)]
-      
-        # Userpage link
-      x %>% html_elements("#cm_cr-review_list .a-profile") %>%
-      html_attr("href") %>%
-      str_remove("\\/ref.*") %>%
-      unique() -> reviews$User[(1+(i-1)*10):(i*10)]
-      
-        # Score
-      x %>% html_elements("#cm_cr-review_list .review-rating") %>%
-        html_text() -> reviews$Score[(1+(i-1)*10):(i*10)]
-      
-        # Comment
-      x %>% html_elements(".review-text-content span") %>%
-        html_text() %>% .[. != ""] -> reviews$Text[(1+(i-1)*10):(i*10)]
-    }
+``` r
+for (i in 1:lastpage) {
+  
+read_html(URL %>% str_c(i)) -> x
+  
+reviews$Product[(1+(i-1)*10):(i*10)] = "Pesto Jar"
+  
+    # Timestamp  
+  x %>% html_elements("#cm_cr-review_list .review-date") %>%
+    html_text() -> reviews$Time[(1+(i-1)*10):(i*10)]
+  
+    # Userpage link
+  x %>% html_elements("#cm_cr-review_list .a-profile") %>%
+  html_attr("href") %>%
+  str_remove("\\/ref.*") %>%
+  unique() -> reviews$User[(1+(i-1)*10):(i*10)]
+  
+    # Score
+  x %>% html_elements("#cm_cr-review_list .review-rating") %>%
+    html_text() -> reviews$Score[(1+(i-1)*10):(i*10)]
+  
+    # Comment
+  x %>% html_elements(".review-text-content span") %>%
+    html_text() %>% .[. != ""] -> reviews$Text[(1+(i-1)*10):(i*10)]
+}
+```
 
 ``` r
 db = as_tibble(reviews)
 db
 ```
 
-    ## # A tibble: 0 x 0
+    ## # A tibble: 290 x 5
+    ##    Product   Time                                     User           Score Text 
+    ##    <chr>     <chr>                                    <chr>          <chr> <chr>
+    ##  1 Pesto Jar Recensito in Italia il 11 febbraio 2021  /gp/profile/a~ 3,0 ~ "Alm~
+    ##  2 Pesto Jar Recensito in Italia il 6 novembre 2020   /gp/profile/a~ 5,0 ~ "E d~
+    ##  3 Pesto Jar Recensito in Italia il 26 novembre 2021  /gp/profile/a~ 4,0 ~ "Un ~
+    ##  4 Pesto Jar Recensito in Italia il 12 luglio 2021    /gp/profile/a~ 5,0 ~ "Amo~
+    ##  5 Pesto Jar Recensito in Italia il 11 settembre 2019 /gp/profile/a~ 5,0 ~ "L'h~
+    ##  6 Pesto Jar Recensito in Italia il 12 gennaio 2021   /gp/profile/a~ 5,0 ~ "La ~
+    ##  7 Pesto Jar Recensito in Italia il 7 gennaio 2022    /gp/profile/a~ 4,0 ~ "Ess~
+    ##  8 Pesto Jar Recensito in Italia il 7 gennaio 2021    /gp/profile/a~ 5,0 ~ "Son~
+    ##  9 Pesto Jar Recensito in Italia il 13 novembre 2021  /gp/profile/a~ 2,0 ~ "Del~
+    ## 10 Pesto Jar Recensito in Italia il 10 ottobre 2021   /gp/profile/a~ 5,0 ~ "Acq~
+    ## # ... with 280 more rows
 
 Yes, the `db` needs a bit more of cleaning, but this is higly dependent
 by the Amazon website you are going to scrape. These data are in
